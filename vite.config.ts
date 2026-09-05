@@ -5,6 +5,19 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
   base: './',
+  build: {
+    rollupOptions: {
+      // React ships via esm.sh importmap (see index.html) so every build artifact
+      // stays small enough for the GitHub Contents API used by the deploy.
+      external: ['react', 'react/jsx-runtime', 'react-dom', 'react-dom/client'],
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules')) return 'vendor';
+          if (id.includes('/src/math/')) return 'math';
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -33,6 +46,15 @@ export default defineConfig({
         navigateFallback: 'index.html',
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         runtimeCaching: [
+          {
+            // React runtime CDN (importmap) — cache-first, long-lived.
+            urlPattern: /^https:\/\/esm\.sh\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'esm-cdn',
+              expiration: { maxEntries: 32, maxAgeSeconds: 30 * 24 * 3600 },
+            },
+          },
           {
             // Future API backend: network-first (Phase 2+). Harmless while client-only.
             urlPattern: /\/api\/.*/,
